@@ -1,4 +1,4 @@
-import axios, { isAxiosError } from "axios";
+import { create, isAxiosError } from "axios";
 import * as SecureStore from "expo-secure-store";
 
 // Set per build in eas.json (production: https://api.mahcanada.com/api) or
@@ -8,7 +8,7 @@ const API_URL =
   process.env.EXPO_PUBLIC_API_URL ??
   (__DEV__ ? "http://192.168.2.56:5000/api" : "https://api.mahcanada.com/api");
 
-const api = axios.create({
+const api = create({
   baseURL: API_URL,
   timeout: 10000,
 });

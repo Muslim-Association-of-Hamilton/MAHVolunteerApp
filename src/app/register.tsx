@@ -4,7 +4,7 @@ import TextField from "@/components/TextField";
 import { homeHref, useAuth } from "@/context/AuthContext";
 import { Gender } from "@/types";
 import { Ionicons } from "@expo/vector-icons";
-import axios from "axios";
+import { isAxiosError } from "axios";
 import { Link, Redirect, useRouter } from "expo-router";
 import { useRef, useState } from "react";
 import {
@@ -150,31 +150,15 @@ export default function Register() {
     } catch (error: unknown) {
       let message = "Please check your details and try again.";
 
-      if (axios.isAxiosError(error)) {
+      if (isAxiosError(error)) {
         if (error.response) {
-          console.log(
-            "[REGISTER] Server error:",
-            error.response.status,
-            JSON.stringify(error.response.data),
-          );
           message = error.response.data?.message ?? message;
         } else if (error.request) {
-          console.log(
-            "[REGISTER] No response:",
-            error.config?.baseURL,
-            error.config?.url,
-            error.code,
-            error.message,
-          );
           message = "Can't reach the server. Check your connection.";
-        } else {
-          console.log("[REGISTER] Request setup error:", error.message);
         }
-      } else if (error instanceof Error) {
-        console.log("[REGISTER] Code error:", error.message, "\n", error.stack);
-      } else {
-        console.log("[REGISTER] Unknown error:", error);
       }
+
+      if (__DEV__) console.log("[REGISTER] failed:", error);
 
       Alert.alert("Couldn't create your account", message);
     } finally {

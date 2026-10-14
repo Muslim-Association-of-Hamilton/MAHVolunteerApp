@@ -1,3 +1,4 @@
+import Button from "@/components/Button";
 import api, { setUnauthorizedHandler } from "@/constants/api";
 import { User } from "@/types";
 import { forgetDevice, registerDevice, unregisterDevice } from "@/utils/push";
@@ -63,6 +64,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [token, setToken] = useState<string | null>(null);
   const [restoring, setRestoring] = useState(true);
+  // The saved session couldn't be checked (offline or server error).
+  const [restoreFailed, setRestoreFailed] = useState(false);
+
+  // Bumped by "Try again" to re-run the restore below.
+  const [restoreAttempt, setRestoreAttempt] = useState(0);
 
   useEffect(() => {
     const restore = async () => {
@@ -79,20 +85,36 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         });
         setUser(data);
       } catch (error) {
-        // Only a rejected token ends the session. Offline or server errors
-        // keep it so the next launch can sign in again automatically.
-        if (isAxiosError(error) && error.response?.status === 401) {
-          await SecureStore.deleteItemAsync("auth_token");
-        }
         setToken(null);
         setUser(null);
+        // Only a rejected token ends the session. Offline or server errors
+        // keep it and offer a retry instead of looking signed out.
+        if (isAxiosError(error)) {
+          if (error.response?.status === 401) {
+            await SecureStore.deleteItemAsync("auth_token");
+          } else {
+            setRestoreFailed(true);
+          }
+        }
       } finally {
         setRestoring(false);
       }
     };
 
     restore();
-  }, []);
+  }, [restoreAttempt]);
+
+  const retryRestore = () => {
+    setRestoreFailed(false);
+    setRestoring(true);
+    setRestoreAttempt((attempt) => attempt + 1);
+  };
+
+  // Gives up on the saved session, e.g. to log in with another account.
+  const abandonSession = async () => {
+    await SecureStore.deleteItemAsync("auth_token");
+    setRestoreFailed(false);
+  };
 
   // Any 401 outside login/register means the token is no longer valid.
   const signedInRef = useRef(false);
@@ -210,6 +232,26 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       <View className="flex-1 items-center justify-center bg-white">
         <ActivityIndicator color="#15803d" accessibilityLabel="Loading" />
         <Text className="mt-3 text-gray-500">Loading...</Text>
+      </View>
+    );
+  }
+
+  if (restoreFailed) {
+    return (
+      <View className="flex-1 justify-center bg-white px-6">
+        <Text
+          accessibilityRole="header"
+          className="text-2xl font-semibold text-gray-900"
+        >
+          Couldn&apos;t connect
+        </Text>
+        <Text className="mt-2 text-base text-gray-500">
+          Check your internet connection and try again.
+        </Text>
+        <View className="mt-8 gap-3">
+          <Button title="Try again" onPress={retryRestore} />
+          <Button title="Log out" variant="outline" onPress={abandonSession} />
+        </View>
       </View>
     );
   }
